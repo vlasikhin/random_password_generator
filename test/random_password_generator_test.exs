@@ -3,8 +3,6 @@ defmodule RandomPasswordGeneratorTest do
   doctest RandomPasswordGenerator
   import ExUnit.CaptureIO
 
-  ExUnit.start()
-
   test "generates password with default options when no options are provided" do
     password = RandomPasswordGenerator.generate_password()
     assert String.length(password) == 20

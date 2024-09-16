@@ -11,13 +11,11 @@ defmodule RandomPasswordGenerator do
 
   ## Example:
       iex> password = RandomPasswordGenerator.generate_password(length: 16, symbols: true, numbers: true)
-      iex> String.length(password)
-      16
+      iex> String.length(password) == 16 and Regex.match?(~r/[\W_]/, password) and Regex.match?(~r/\d/, password)
   """
 
   @uppercase_letters ~c"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
   @lowercase_letters ~c"abcdefghijklmnopqrstuvwxyz"
-  @numbers ~c"0123456789"
   @symbols ~c"!@#$%^&*()-_=+[]{}|;:,.<>?/"
   @default_length 20
 
@@ -28,17 +26,18 @@ defmodule RandomPasswordGenerator do
     opts = apply_defaults_if_no_options(opts)
 
     length = get_length(opts)
-    available_chars = build_available_chars(opts)
+    available_chars = build_available_chars(opts, length)
 
-    Stream.repeatedly(fn -> Enum.random(available_chars) end)
-    |> Enum.take(length)
+    Enum.take_random(available_chars, length)
     |> List.to_string()
   end
 
   defp apply_defaults_if_no_options(opts) do
     required_keys = [:symbols, :numbers, :lowletters, :upletters]
 
-    case Enum.all?(required_keys, fn key -> Keyword.get(opts, key) == nil end) do
+    required_keys
+    |> Enum.all?(&(not Keyword.has_key?(opts, &1)))
+    |> case do
       true ->
         Keyword.merge(opts,
           symbols: true,
@@ -53,16 +52,26 @@ defmodule RandomPasswordGenerator do
     end
   end
 
-  defp build_available_chars(opts) do
+  def random_numbers_list(length), do: do_random_numbers_list(length, [])
+
+  defp do_random_numbers_list(length, list) when length > 0,
+    do: do_random_numbers_list(length - 1, [random_number() | list])
+
+  defp do_random_numbers_list(_, list), do: list
+
+  defp random_number,
+    do: Integer.to_string(:rand.uniform(10) - 1)
+
+  defp build_available_chars(opts, length) do
     []
-    |> maybe_add_chars(Keyword.get(opts, :lowletters, false), @lowercase_letters)
-    |> maybe_add_chars(Keyword.get(opts, :upletters, false), @uppercase_letters)
-    |> maybe_add_chars(Keyword.get(opts, :numbers, false), @numbers)
-    |> maybe_add_chars(Keyword.get(opts, :symbols, false), @symbols)
+    |> maybe_add_chars(Keyword.fetch(opts, :numbers), random_numbers_list(length))
+    |> maybe_add_chars(Keyword.fetch(opts, :lowletters), @lowercase_letters)
+    |> maybe_add_chars(Keyword.fetch(opts, :upletters), @uppercase_letters)
+    |> maybe_add_chars(Keyword.fetch(opts, :symbols), @symbols)
   end
 
-  defp maybe_add_chars(acc, true, chars), do: acc ++ chars
-  defp maybe_add_chars(acc, false, _chars), do: acc
+  defp maybe_add_chars(acc, {:ok, true}, chars), do: acc ++ chars
+  defp maybe_add_chars(acc, _add?, _chars), do: acc
 
   defp get_length(opts) do
     Keyword.get(opts, :length, @default_length)
